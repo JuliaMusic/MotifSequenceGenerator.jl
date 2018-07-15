@@ -25,7 +25,7 @@ module MotifSequenceGenerator
 
 using Base.Iterators
 
-export random_sequence, all_possible_sums, _instantiate_sequence
+export random_sequence, all_possible_sums
 
 struct DeadEndMotifs <: Exception
   tries::Int
@@ -33,7 +33,7 @@ struct DeadEndMotifs <: Exception
   tailcut::Int
 end
 Base.showerror(io::IO, e::DeadEndMotifs) = print(io,
-"DeadEndMotifs ERROR: Couldn't find a proper sequence with $(e.tries) random tries, "*
+"DeadEndMotifs: Couldn't find a proper sequence with $(e.tries) random tries, "*
 "each with summands up to $(e.summands) (total tailcuts: $(e.tailcut)).")
 
 
@@ -84,6 +84,10 @@ function random_sequence(motifs::Vector{M}, q::Int,
 
     idxs = 1:length(motifs)
     motifs0, motiflens = _motifs_at_origin(motifs, limits, translate)
+
+    q < minimum(motiflens) && throw(ArgumentError(
+    "Minimum length of motifs is less than `q`. Impossible to make a sequence."
+    ))
 
     worked = false; count = 0; seq = Int[]
     while worked == false
@@ -179,6 +183,13 @@ function _complete_sequence!(seq, motiflens, q, summands, tailcut)
 end
 
 # Function provided by Robert Hoenig in stackoverflow
+"""
+    all_possible_sums(summands, n)
+Compute all possible sums from combining `n` (with repetition)
+elements from `summands`. Return a vector of tuples: the first
+entry of each tuple is the sum, while the second is the indices of summands
+used to compute the sum.
+"""
 function all_possible_sums(summands, n)
     idxs = 1:length(summands)
     map(
