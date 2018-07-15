@@ -46,7 +46,8 @@ default_translate(motif, t) = motif .+ t
 """
     random_sequence(motifs::Vector{M}, q [, limits, translate]; kwargs...)
 Create a random sequence of motifs of type `M`, under the constraint that the
-sequence has "length" **exactly** `q`.
+sequence has "length" **exactly** `q`. Return the sequence itself as well as the
+sequence of indices of `motifs` used to create it.
 
 "length" here means an abstracted "temporal length" defined by the struct `M`,
 based on the `limits` and `translate` functions.
@@ -98,7 +99,7 @@ function random_sequence(motifs::Vector{M}, q::Int,
         count += 1
     end
 
-    return _instantiate_sequence(motifs0, motiflens, seq, translate)#, seq
+    return _instantiate_sequence(motifs0, motiflens, seq, translate), seq
 end
 
 """
