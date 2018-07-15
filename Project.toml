@@ -1,0 +1,6 @@
+authors = ["George Datseris <datseris.george@gmail.com>"]
+name = "MotifSequenceGenerator"
+uuid = "2ffb0f6e-881a-11e8-0840-8158d53f3d37"
+version = "0.1.0"
+
+[deps]
