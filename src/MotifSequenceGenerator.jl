@@ -3,7 +3,8 @@
 This module generates random sequences of motifs, under the constrain that the
 sequence has some total length **exactly equal** to `q`.
 
-A motif can be a vector of *anything*. The notion of "temporal length" is defined
+The motifs are contained in a vector, and they can be *anything*.
+The notion of "temporal length" is defined
 based on the following two functions, which must be provided for the motifs:
 
 * `limits(motif)` : Some function that given the `motif` it returns the
