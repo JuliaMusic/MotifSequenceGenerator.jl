@@ -25,6 +25,7 @@ ok!
 module MotifSequenceGenerator
 
 using Base.Iterators
+using Combinatorics, Random
 
 export random_sequence, all_possible_sums
 
@@ -173,7 +174,7 @@ function _complete_sequence!(seq, motiflens, q, summands, tailcut)
                 if remainder ∈ sums
                     cases = findall(in(remainder), sums)
                     if !isempty(cases)
-                        idxs_of_vals = everything[rand(cases)][2]
+                        idxs_of_vals = shuffle!(everything[rand(cases)][2])
                         push!(seq, idxs_of_vals...)
                         return true
                     end
@@ -184,38 +185,24 @@ function _complete_sequence!(seq, motiflens, q, summands, tailcut)
     return false
 end
 
-# Function provided by Robert Hoenig in stackoverflow
+# Function provided by Mark Birtwistle in stackoverflow
 """
     all_possible_sums(summands, n)
-Compute all possible sums from combining `n` (with repetition)
-elements from `summands`. Return a vector of tuples: the first
+Compute all possible sums from combining `n` elements from `summands`,
+with repetition and using only unique combinations.
+
+Return a vector of tuples: the first
 entry of each tuple is the sum, while the second is the indices of summands
 used to compute the sum.
 """
-function all_possible_sums(summands, n)
-    idxs = 1:length(summands)
-    map(
-    # Map the possible combinations of `n` entries of `summands` to a tuple
-    # containing their sum and the *indices* of summands used.
-    x -> (sum(summands[xi] for xi in x), x),
-    # Generate all possible combinations of `n` elements out of `summands`,
-    # with repetition
-    reduce(
-    # Concatenate previously generated combinations with the new ones
-    (x1, x2) -> vcat(
-                    x1,
-                    vec(collect(
-                            # Cartesian product of all arguments.
-                            product(
-                                # Use indices of `summands` for `x2` arguments.
-                                fill(
-                                    idxs,
-                                    x2)...)))),
-        # Specify for what lengths we want to generate combinations.
-        n;
-        # Neutral element (empty array).
-        init = Vector{Tuple{Int, NTuple{n, Int}}}[])
-    )
+function all_possible_sums(summands::Vector{T}, n) where {T}
+    m = length(summands)
+    r = Vector{Tuple{T, Vector{Int}}}(undef, binomial(m + n - 1, n))
+    s = with_replacement_combinations(eachindex(summands), n)
+    for (j, i) in enumerate(s)
+        r[j] = (sum(summands[j] for j in i), i)
+    end
+    return r
 end
 
 function _instantiate_sequence(motifs0::Vector{M}, motiflens, seq, translate) where M
