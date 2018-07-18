@@ -4,7 +4,7 @@ struct Shout
 end
 using Random, Test
 
-begin
+let
 
 N = 5
 

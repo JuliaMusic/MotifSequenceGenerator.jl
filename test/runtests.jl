@@ -15,5 +15,3 @@ end
 
 include("integer_length_tests.jl")
 include("float_length_tests.jl")
-
-end
