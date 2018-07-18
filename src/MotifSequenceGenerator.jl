@@ -1,30 +1,24 @@
 """
     MotifSequenceGenerator
 This module generates random sequences of motifs, under the constrain that the
-sequence has some total length **exactly equal** to `q`.
+sequence has some total length ℓ so that `q - δq ≤ ℓ ≤ q + δq`.
 
 The motifs are contained in a vector, and they can be *anything*.
-The notion of "temporal length" is defined
+The notion of "length" is defined
 based on the following two functions, which must be provided for the motifs:
 
 * `limits(motif)` : Some function that given the `motif` it returns the
-  `(start, end)` of the the motif in the same units as `q`. Defaults to
-  `(1, length(motif))`. Notice that this function establishes a measure of
-  temporal length, which simply is `end - start`.
+  `(start, end)` of the the motif in the same units as `q`.
+  Notice that this function establishes a measure of
+  length, which simply is `end - start`.
 * `translate(motif, t)` : Some function that given the `motif` it returns a *new*
-  motif which is temporally translated by `t` (either negative or positive), with
-  respect to the same units as `q`. Defaults to `motif .+ n`.
+  motif which is translated by `t` (either negative or positive), with
+  respect to the same units as `q`.
 
 All main functionality is given by the function [`random_sequence`](@ref).
-
-**At the moment this module has not been tested with non-integer lengths**.
-
-TODO: For non-integer `q` ask a `δq` so that lengths up to `q ± δq` are accepted as
-ok!
 """
 module MotifSequenceGenerator
 
-using Base.Iterators
 using Combinatorics, Random
 
 export random_sequence, all_possible_sums
@@ -38,23 +32,21 @@ Base.showerror(io::IO, e::DeadEndMotifs) = print(io,
 "DeadEndMotifs: Couldn't find a proper sequence with $(e.tries) random tries, "*
 "each with summands up to $(e.summands) (total tailcuts: $(e.tailcut)).")
 
-
-
-default_limits(motif) = (1, length(motif))
-default_translate(motif, t) = motif .+ t
+predicate(ℓ, q, δq) = q - δq ≤ ℓ ≤ q + δq
 
 
 
 """
-    random_sequence(motifs::Vector{M}, q [, limits, translate]; kwargs...)
+    random_sequence(motifs::Vector{M}, q, limits, translate, δq = 0; kwargs...)
 Create a random sequence of motifs of type `M`, under the constraint that the
-sequence has "length" **exactly** `q`. Return the sequence itself as well as the
+sequence has "length" ℓ **exactly** within `q - δq ≤ ℓ ≤ q + δq`.
+Return the sequence itself as well as the
 sequence of indices of `motifs` used to create it.
 
-"length" here means an abstracted "temporal length" defined by the struct `M`,
+"length" here means an abstracted length defined by the struct `M`,
 based on the `limits` and `translate` functions.
-It does **not** refer to the amount of elements, although coincidentally this is the
-default behavior. Please see [`MotifSequenceGenerator`](@ref) for defining `limits`
+It does **not** refer to the amount of elements!
+Please see [`MotifSequenceGenerator`](@ref) for defining `limits`
 and `translate`.
 
 ## Description & Keywords
@@ -65,8 +57,9 @@ of random sequences is set by the `tries` keyword (default 5).
 For each random try, it is first check whether the sequence is already correct.
 If not, the last entry of the sequence is dropped. Then, since the sequence is now
 already smaller than `q`, all possible sums of `summands` out of the motif pool
-are checked. If some combination of `summands` sums to exactly the difference, they are
-added to the sequence. For multiple satisfactory combinations, a random one is picked.
+are checked. If some combination of `summands` sums to exactly the difference,
+they are added to the sequence.
+For multiple satisfactory combinations, a random one is picked.
 
 If the random combination of `summands` does not fit, one more entry is dropped
 from the sequence and the process is repeated.
@@ -82,7 +75,7 @@ If after going though all these combinations of possible sequences we do not fin
 a proper one, an error is thrown.
 """
 function random_sequence(motifs::Vector{M}, q::Int,
-    limits = default_limits, translate = default_translate;
+    limits, translate, δq = 0;
     tries = 5, summands = 3, tailcut = 2) where {M}
 
     idxs = 1:length(motifs)
@@ -96,8 +89,12 @@ function random_sequence(motifs::Vector{M}, q::Int,
     while worked == false
         count > tries && throw(DeadEndMotifs(tries, summands, tailcut))
 
-        seq, seq_length = _random_sequence_try(motiflens, q)
-        worked = _complete_sequence!(seq, motiflens, q, summands, tailcut)
+        seq, seq_length = _random_sequence_try(motiflens, q, δq)
+        if δq == 3
+            worked = _complete_sequence!(seq, motiflens, q, summands, tailcut)
+        else
+            worked = _complete_sequence!(seq, motiflens, q, δq, summands, tailcut)
+        end
         count += 1
     end
 
@@ -123,11 +120,11 @@ end
     _random_sequence_try(motiflens, q) -> seq, seq_length
 Return a random sequence of motif indices
 so that the total sequence is *guaranteed* to have total length of
-`q ≤ s ≤ q - maximum(motiflens)`.
+`q - δq ≤ ℓ ≤ q - δq - maximum(motiflens)`.
 """
-function _random_sequence_try(motiflens, q)
+function _random_sequence_try(motiflens, q, δq)
     seq = Int[]; seq_length = 0; idxs = 1:length(motiflens)
-    while seq_length < q
+    while seq_length < q - δq
         i = rand(idxs)
         push!(seq, i)
         seq_length += motiflens[i]
@@ -135,50 +132,69 @@ function _random_sequence_try(motiflens, q)
     return seq, seq_length
 end
 
+function _complete_sequence!(seq, motiflens, q, δq, summands, tailcut)
+    # notice the ||
+    _complete_sequence_extra!(seq, motiflens, q, δq) ||
+    _complete_sequence_remainder!(seq, motiflens, q, δq, summands, tailcut) ||
+    false
+end
+function _complete_sequence_extra!(seq, motiflens, q, δq)
 
-function _complete_sequence!(seq, motiflens, q, summands, tailcut)
+    ℓ = sum(motiflens[k] for k in seq)
 
-    remainder = q - sum(motiflens[k] for k in seq)
-    if remainder == 0
-        # Case 0: The sequence is already exactly equal to q
+    if q - δq ≤ ℓ ≤ q + δq
+        # Case 0: The sequence is already within δq limits
         return true
-    elseif remainder < 0 && -remainder ∈ motiflens
-        # Case 1: There is an extra difference, which is an
-        # exact length of some motif.
+    elseif (extra = ℓ - q - δq) > 0
+        # Case 1: There is an extra difference. We check if it can be
+        # accounted for by deleted some motif with length up to `extra + 2δq`.
         # We find the possible motifs, pick a random one, and pick
         # a random position in the sequence that it exists.
         # Delete that entry of the sequence.
-        mi = rand(findall((in)(-remainder), motiflens))
-        possible = findall((in)(mi), seq)
+        mi = findall(x -> extra ≤ x ≤ extra + 2δq, motiflens)
+        possible = findall(in(mi), seq)
         if !isempty(possible)
             deleteat!(seq, rand(possible))
             return true
         end
-    else
-        # Case 2: Recursive deletion of last entry of the sequence, and trying to
-        # see if it can be completed with some combination of existing motifs
-        tcut = 0
-        while tcut < tailcut
-            tcut += 1
-            pop!(seq)
-            isempty(seq) && return false
-            remainder = q - sum(motiflens[k] for k in seq)
-            if remainder ∈ motiflens
-                mi = rand(findall(in(remainder), motiflens))
-                push!(seq, mi)
+    end
+    return false
+end
+function _complete_sequence_remainder!(seq, motiflens, q, δq, summands, tailcut)
+
+    # Case 2: Recursive deletion of last entry of the sequence, and trying to
+    # see if it can be completed with some combination of existing motifs
+    tcut = 0
+    while tcut < tailcut
+        tcut += 1
+        pop!(seq)
+        isempty(seq) && return false
+
+        # I Think the following if is unecessary?...
+        # if q - δq - sum(motiflens[k] for k in seq) < 0
+        #     ok = _complete_sequence_extra!(seq, motiflens, q, δq)
+        #     isempty(seq) && return false
+        #     ok && return true
+        # end
+
+        # At this point ℓ is guaranteed less than q - δq
+        remainder = q - δq - sum(motiflens[k] for k in seq)
+        @assert remainder > 0
+
+        mi = findall(x -> remainder ≤ x ≤ remainder + 2δq, motiflens)
+        if !isempty(mi)
+            push!(seq, rand(mi))
+            return true
+        end
+
+        for n in 2:summands
+            everything = all_possible_sums(motiflens, n)
+            sums = [e[1] for e in everything]
+            cases = findall(x -> remainder ≤ x ≤ remainder + 2δq, sums)
+            if !isempty(cases)
+                idxs_of_vals = shuffle!(everything[rand(cases)][2])
+                push!(seq, idxs_of_vals...)
                 return true
-            end
-            for n in 2:summands
-                everything = all_possible_sums(motiflens, n)
-                sums = [e[1] for e in everything]
-                if remainder ∈ sums
-                    cases = findall(in(remainder), sums)
-                    if !isempty(cases)
-                        idxs_of_vals = shuffle!(everything[rand(cases)][2])
-                        push!(seq, idxs_of_vals...)
-                        return true
-                    end
-                end
             end
         end
     end
@@ -216,4 +232,55 @@ function _instantiate_sequence(motifs0::Vector{M}, motiflens, seq, translate) wh
 end
 
 
+# Handling with δq = 0
+function _complete_sequence!_old(seq, motiflens, q, summands, tailcut)
+
+    remainder = q - sum(motiflens[k] for k in seq)
+    if remainder == 0
+        # Case 0: The sequence is already exactly equal to q
+        return true
+    elseif remainder < 0 && -remainder ∈ motiflens
+        # Case 1: There is an extra difference, which is an
+        # exact length of some motif.
+        # We find the possible motifs, pick a random one, and pick
+        # a random position in the sequence that it exists.
+        # Delete that entry of the sequence.
+        mi = findall(in(-remainder), motiflens)
+        possible = findall(in(mi), seq)
+        if !isempty(possible)
+            deleteat!(seq, rand(possible))
+            return true
+        end
+    else
+        # Case 2: Recursive deletion of last entry of the sequence, and trying to
+        # see if it can be completed with some combination of existing motifs
+        tcut = 0
+        while tcut < tailcut
+            tcut += 1
+            pop!(seq)
+            isempty(seq) && return false
+            remainder = q - sum(motiflens[k] for k in seq)
+            if remainder ∈ motiflens
+                mi = rand(findall(in(remainder), motiflens))
+                push!(seq, mi)
+                return true
+            end
+            for n in 2:summands
+                everything = all_possible_sums(motiflens, n)
+                sums = [e[1] for e in everything]
+                if remainder ∈ sums
+                    cases = findall(in(remainder), sums)
+                    if !isempty(cases)
+                        idxs_of_vals = shuffle!(everything[rand(cases)][2])
+                        push!(seq, idxs_of_vals...)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
 end
+
+
+end#Module
