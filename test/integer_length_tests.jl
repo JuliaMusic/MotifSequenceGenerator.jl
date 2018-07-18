@@ -2,9 +2,9 @@ struct Shout
   shout::String
   start::Int
 end
-using Random
+using Random, Test
 
-let
+begin
 
 N = 5
 
