@@ -74,15 +74,15 @@ skyrockets for large `summands`!).
 If after going though all these combinations of possible sequences we do not find
 a proper one, an error is thrown.
 """
-function random_sequence(motifs::Vector{M}, q::Int,
+function random_sequence(motifs::Vector{M}, q,
     limits, translate, δq = 0;
     tries = 5, summands = 3, tailcut = 2) where {M}
 
     idxs = 1:length(motifs)
     motifs0, motiflens = _motifs_at_origin(motifs, limits, translate)
 
-    q < minimum(motiflens) && throw(ArgumentError(
-    "Minimum length of motifs is less than `q`. Impossible to make a sequence."
+    q - δq < minimum(motiflens) && throw(ArgumentError(
+    "Minimum length of motifs is greater than `q - δq`. Impossible to make a sequence."
     ))
 
     worked = false; count = 0; seq = Int[]
@@ -107,7 +107,8 @@ Bring all motifs to the origin and compute the motif lengths.
 """
 function _motifs_at_origin(motifs::Vector{M}, limits, translate) where M
     motifs0 = similar(motifs)
-    motiflens = zeros(Int, length(motifs))
+    a, b = limits(motifs[1])
+    motiflens = zeros(typeof(b-a), length(motifs))
     for i in 1:length(motifs)
         start, fine = limits(motifs[i])
         motifs0[i] = start == 0 ? motifs[i] : translate(motifs[i], -start)
