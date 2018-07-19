@@ -8,9 +8,9 @@ The notion of "length" is defined
 based on the following two functions, which must be provided for the motifs:
 
 * `limits(motif)` : Some function that given the `motif` it returns the
-  `(start, end)` of the the motif in the same units as `q`.
+  `(start, fine)` of the the motif in the same units as `q`.
   Notice that this function establishes a measure of
-  length, which simply is `end - start`.
+  length, which simply is `fine - start`.
 * `translate(motif, t)` : Some function that given the `motif` it returns a *new*
   motif which is translated by `t` (either negative or positive), with
   respect to the same units as `q`.
@@ -32,8 +32,6 @@ Base.showerror(io::IO, e::DeadEndMotifs) = print(io,
 "DeadEndMotifs: Couldn't find a proper sequence with $(e.tries) random tries, "*
 "each with summands up to $(e.summands) (total tailcuts: $(e.tailcut)).")
 
-predicate(ℓ, q, δq) = q - δq ≤ ℓ ≤ q + δq
-
 
 
 """
@@ -51,8 +49,8 @@ and `translate`.
 
 ## Description & Keywords
 The algorithm works as follows: First a random sequence of motifs is created,
-so that it has length of `q ≤ s ≤ q - maximum(motiflengths)`. The possible tries
-of random sequences is set by the `tries` keyword (default 5).
+so that it has length of `q - δq ≤ ℓ ≤ q - δq + maximum(motiflengths)`.
+The possible tries of random sequences is set by the `tries` keyword (default `5`).
 
 For each random try, it is first check whether the sequence is already correct.
 If not, the last entry of the sequence is dropped. Then, since the sequence is now
@@ -82,7 +80,8 @@ function random_sequence(motifs::Vector{M}, q,
     motifs0, motiflens = _motifs_at_origin(motifs, limits, translate)
 
     q - δq < minimum(motiflens) && throw(ArgumentError(
-    "Minimum length of motifs is greater than `q - δq`. Impossible to make a sequence."
+    "Minimum length of motifs is greater than `q - δq`! "*
+    "Impossible to make a sequence."
     ))
 
     worked = false; count = 0; seq = Int[]
@@ -121,7 +120,7 @@ end
     _random_sequence_try(motiflens, q) -> seq, seq_length
 Return a random sequence of motif indices
 so that the total sequence is *guaranteed* to have total length of
-`q - δq ≤ ℓ ≤ q - δq - maximum(motiflens)`.
+`q - δq ≤ ℓ ≤ q - δq + maximum(motiflens)`.
 """
 function _random_sequence_try(motiflens, q, δq)
     seq = Int[]; seq_length = 0; idxs = 1:length(motiflens)
@@ -205,8 +204,8 @@ end
 # Function provided by Mark Birtwistle in stackoverflow
 """
     all_possible_sums(summands, n)
-Compute all possible sums from combining `n` elements from `summands`,
-with repetition and using only unique combinations.
+Compute all possible sums from combining `n` elements from `summands`
+(with repetition), only using unique combinations.
 
 Return a vector of tuples: the first
 entry of each tuple is the sum, while the second is the indices of summands
@@ -232,56 +231,6 @@ function _instantiate_sequence(motifs0::Vector{M}, motiflens, seq, translate) wh
     return ret
 end
 
-
-# Handling with δq = 0
-function _complete_sequence!_old(seq, motiflens, q, summands, tailcut)
-
-    remainder = q - sum(motiflens[k] for k in seq)
-    if remainder == 0
-        # Case 0: The sequence is already exactly equal to q
-        return true
-    elseif remainder < 0 && -remainder ∈ motiflens
-        # Case 1: There is an extra difference, which is an
-        # exact length of some motif.
-        # We find the possible motifs, pick a random one, and pick
-        # a random position in the sequence that it exists.
-        # Delete that entry of the sequence.
-        mi = findall(in(-remainder), motiflens)
-        possible = findall(in(mi), seq)
-        if !isempty(possible)
-            deleteat!(seq, rand(possible))
-            return true
-        end
-    else
-        # Case 2: Recursive deletion of last entry of the sequence, and trying to
-        # see if it can be completed with some combination of existing motifs
-        tcut = 0
-        while tcut < tailcut
-            tcut += 1
-            pop!(seq)
-            isempty(seq) && return false
-            remainder = q - sum(motiflens[k] for k in seq)
-            if remainder ∈ motiflens
-                mi = rand(findall(in(remainder), motiflens))
-                push!(seq, mi)
-                return true
-            end
-            for n in 2:summands
-                everything = all_possible_sums(motiflens, n)
-                sums = [e[1] for e in everything]
-                if remainder ∈ sums
-                    cases = findall(in(remainder), sums)
-                    if !isempty(cases)
-                        idxs_of_vals = shuffle!(everything[rand(cases)][2])
-                        push!(seq, idxs_of_vals...)
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
 
 
 end#Module
