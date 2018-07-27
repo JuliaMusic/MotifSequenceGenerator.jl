@@ -1,3 +1,6 @@
+using Test
+using MotifSequenceGenerator
+
 struct Shout
   shout::String
   start::Int
@@ -24,7 +27,8 @@ end
 
 @testset "Integer Length δq=$(δq)" for δq in [0, 2]
     for j in 1:N
-        r, s = random_sequence(shouts, q, shoutlimits, shouttranslate, δq)
+        r, s = random_sequence(shouts, q, shoutlimits, shouttranslate, δq;
+        tries = 10)
         ℓ = shoutlens(r)
         @test q - δq ≤ ℓ ≤ q + δq
     end

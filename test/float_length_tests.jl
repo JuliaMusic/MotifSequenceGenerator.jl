@@ -1,3 +1,6 @@
+using Test
+using MotifSequenceGenerator
+
 struct FloatShout
   shout::String
   dur::Float64
@@ -33,6 +36,7 @@ end
 end
 
 using MotifSequenceGenerator: DeadEndMotifs
-@test_throws DeadEndMotifs random_sequence(shouts, q, shoutlimits, shouttranslate, 0.0)
+@test_throws ArgumentError random_sequence(shouts, q, shoutlimits, shouttranslate, 0.0)
+@test_throws DeadEndMotifs random_sequence(shouts, q, shoutlimits, shouttranslate, 0.000001)
 
 end
