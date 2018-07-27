@@ -2,19 +2,6 @@
     MotifSequenceGenerator
 This module generates random sequences of motifs, under the constrain that the
 sequence has some total length ℓ so that `q - δq ≤ ℓ ≤ q + δq`.
-
-The motifs are contained in a vector, and they can be *anything*.
-The notion of "length" is defined
-based on the following two functions, which must be provided for the motifs:
-
-* `limits(motif)` : Some function that given the `motif` it returns the
-  `(start, fine)` of the the motif in the same units as `q`.
-  Notice that this function establishes a measure of
-  length, which simply is `fine - start`.
-* `translate(motif, t)` : Some function that given the `motif` it returns a *new*
-  motif which is translated by `t` (either negative or positive), with
-  respect to the same units as `q`.
-
 All main functionality is given by the function [`random_sequence`](@ref).
 """
 module MotifSequenceGenerator
@@ -32,22 +19,7 @@ Base.showerror(io::IO, e::DeadEndMotifs) = print(io,
 "DeadEndMotifs: Couldn't find a proper sequence with $(e.tries) random tries, "*
 "each with summands up to $(e.summands) (total tailcuts: $(e.tailcut)).")
 
-
-
-"""
-    random_sequence(motifs::Vector{M}, q, limits, translate, δq = 0; kwargs...)
-Create a random sequence of motifs of type `M`, under the constraint that the
-sequence has "length" ℓ **exactly** within `q - δq ≤ ℓ ≤ q + δq`.
-Return the sequence itself as well as the
-sequence of indices of `motifs` used to create it.
-
-"length" here means an abstracted length defined by the struct `M`,
-based on the `limits` and `translate` functions.
-It does **not** refer to the amount of elements!
-Please see [`MotifSequenceGenerator`](@ref) for defining `limits`
-and `translate`.
-
-## Description & Keywords
+#= Algorithm description
 The algorithm works as follows: First a random sequence of motifs is created,
 so that it has length of `q - δq ≤ ℓ ≤ q - δq + maximum(motiflengths)`.
 The possible tries of random sequences is set by the `tries` keyword (default `5`).
@@ -71,6 +43,34 @@ skyrockets for large `summands`!).
 
 If after going though all these combinations of possible sequences we do not find
 a proper one, an error is thrown.
+=#
+
+"""
+    random_sequence(motifs::Vector{M}, q, limits, translate, δq = 0; kwargs...)
+Create a random sequence of motifs of type `M`, under the constraint that the
+sequence has "length" `ℓ` **exactly** within `q - δq ≤ ℓ ≤ q + δq`.
+Return the sequence itself as well as the
+sequence of indices of `motifs` used to create it.
+
+"length" here means an abstracted length defined by the struct `M`,
+based on the `limits` and `translate` functions.
+It does **not** refer to the amount of elements!
+
+`M` can be anything, given the two functions
+* `limits(motif)` : Some function that given the `motif` it returns the
+  `(start, fine)` of the the motif in the same units as `q`.
+  This function establishes a measure of length, which simply is `fine - start`.
+* `translate(motif, t)` : Some function that given the `motif` it returns a *new*
+  motif which is translated by `t` (either negative or positive), with
+  respect to the same units as `q`.
+
+## Keywords
+Please see the source code (use `@which`) for a full description of the algorithm.
+
+* `tries = 5` : Up to how many initial random sequences are accepted.
+* `taulcut = 2` : Up to how times an element is dropped from the initial guess.
+* `summands = 3` : Up to how many motifs may be combined as a sum to
+  complete a sequence.
 """
 function random_sequence(motifs::Vector{M}, q,
     limits, translate, δq = 0;
@@ -82,6 +82,12 @@ function random_sequence(motifs::Vector{M}, q,
     q - δq < minimum(motiflens) && throw(ArgumentError(
     "Minimum length of motifs is greater than `q - δq`! "*
     "Impossible to make a sequence."
+    ))
+
+    eltype(motiflens) <: AbstractFloat && δq == 0 && throw(ArgumentError(
+    "Due to finite precision of floating values, it is almost always impossible "*
+    "to create a sequence of *exact* amount of floating length. Please provide "*
+    "a δq > 0."
     ))
 
     worked = false; count = 0; seq = Int[]
