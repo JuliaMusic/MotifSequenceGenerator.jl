@@ -95,11 +95,9 @@ function random_sequence(motifs::Vector{M}, q,
         count > tries && throw(DeadEndMotifs(tries, summands, tailcut))
 
         seq, seq_length = _random_sequence_try(motiflens, q, δq)
-        if δq == 3
-            worked = _complete_sequence!(seq, motiflens, q, summands, tailcut)
-        else
-            worked = _complete_sequence!(seq, motiflens, q, δq, summands, tailcut)
-        end
+
+        worked = _complete_sequence!(seq, motiflens, q, δq, summands, tailcut)
+
         count += 1
     end
 
