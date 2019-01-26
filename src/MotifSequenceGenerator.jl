@@ -6,7 +6,7 @@ All main functionality is given by the function [`random_sequence`](@ref).
 """
 module MotifSequenceGenerator
 
-using Combinatorics, Random
+using Combinatorics, Random, StatsBase
 
 export random_sequence, all_possible_sums
 
@@ -23,11 +23,12 @@ Base.showerror(io::IO, e::DeadEndMotifs) = print(io,
 The algorithm works as follows: First a random sequence of motifs is created,
 so that it has length of `q - δq ≤ ℓ ≤ q - δq + maximum(motiflengths)`.
 The possible tries of random sequences is set by the `tries` keyword (default `5`).
+The sequence is optionally sampled given a probability vector.
 
-For each random try, it is first check whether the sequence is already correct.
+For each random try, it is first checked whether the sequence is already correct.
 If not, the last entry of the sequence is dropped. Then, since the sequence is now
 already smaller than `q`, all possible sums of `summands` out of the motif pool
-are checked. If some combination of `summands` sums to exactly the difference,
+are checked. If some combination of `summands` sums to the difference,
 they are added to the sequence.
 For multiple satisfactory combinations, a random one is picked.
 
@@ -50,7 +51,9 @@ a proper one, an error is thrown.
 Create a random sequence of motifs of type `M`, under the constraint that the
 sequence has "length" `ℓ` **exactly** within `q - δq ≤ ℓ ≤ q + δq`.
 Return the sequence itself as well as the
-sequence of indices of `motifs` used to create it.
+sequence of indices of `motifs` used to create it. A vector of probabilities `weights`
+can be given as a keyword argument, which then dictates the sampling probability
+for each entry of `motifs` for the initial sequence created.
 
 "length" here means an abstracted length defined by the struct `M`,
 based on the `limits` and `translate` functions.
@@ -64,7 +67,7 @@ It does **not** refer to the amount of elements!
   motif which is translated by `t` (either negative or positive), with
   respect to the same units as `q`.
 
-## Keywords
+## Other Keywords
 Please see the source code (use `@which`) for a full description of the algorithm.
 
 * `tries = 5` : Up to how many initial random sequences are accepted.
@@ -74,7 +77,10 @@ Please see the source code (use `@which`) for a full description of the algorith
 """
 function random_sequence(motifs::Vector{M}, q,
     limits, translate, δq = 0;
-    tries = 5, summands = 3, tailcut = 2) where {M}
+    tries = 5, summands = 3, tailcut = 2,
+    weights = ones(length(motifs))) where {M}
+
+    ws = _toweight(weights)
 
     idxs = 1:length(motifs)
     motifs0, motiflens = _motifs_at_origin(motifs, limits, translate)
@@ -94,7 +100,7 @@ function random_sequence(motifs::Vector{M}, q,
     while worked == false
         count > tries && throw(DeadEndMotifs(tries, summands, tailcut))
 
-        seq, seq_length = _random_sequence_try(motiflens, q, δq)
+        seq, seq_length = _random_sequence_try(motiflens, q, δq, ws)
 
         worked = _complete_sequence!(seq, motiflens, q, δq, summands, tailcut)
 
@@ -103,6 +109,8 @@ function random_sequence(motifs::Vector{M}, q,
 
     return _instantiate_sequence(motifs0, motiflens, seq, translate), seq
 end
+
+_toweight(a) = (s = sum(a); ProbabilityWeights(a./s, 1))
 
 """
     _motifs_at_origin(motifs, limits, translate) -> (motifs0, motiflens)
@@ -121,15 +129,15 @@ function _motifs_at_origin(motifs::Vector{M}, limits, translate) where M
 end
 
 """
-    _random_sequence_try(motiflens, q) -> seq, seq_length
+    _random_sequence_try(motiflens, q, δq [, ws]) -> seq, seq_length
 Return a random sequence of motif indices
 so that the total sequence is *guaranteed* to have total length of
 `q - δq ≤ ℓ ≤ q - δq + maximum(motiflens)`.
 """
-function _random_sequence_try(motiflens, q, δq)
+function _random_sequence_try(motiflens, q, δq, ws = defaultweights(motiflens))
     seq = Int[]; seq_length = 0; idxs = 1:length(motiflens)
     while seq_length < q - δq
-        i = rand(idxs)
+        i = sample(idxs, ws)
         push!(seq, i)
         seq_length += motiflens[i]
     end
@@ -173,13 +181,6 @@ function _complete_sequence_remainder!(seq, motiflens, q, δq, summands, tailcut
         tcut += 1
         pop!(seq)
         isempty(seq) && return false
-
-        # I Think the following if is unecessary?...
-        # if q - δq - sum(motiflens[k] for k in seq) < 0
-        #     ok = _complete_sequence_extra!(seq, motiflens, q, δq)
-        #     isempty(seq) && return false
-        #     ok && return true
-        # end
 
         # At this point ℓ is guaranteed less than q - δq
         remainder = q - δq - sum(motiflens[k] for k in seq)

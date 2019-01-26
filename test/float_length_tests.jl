@@ -35,6 +35,16 @@ end
     end
 end
 
+@testset "Float Length, Weights, δq=$(δq)" for δq in [1.0, 2.0]
+    weights = rand(1:5, N)
+    for j in 1:N
+        r, s = random_sequence(shouts, q, shoutlimits, shouttranslate, δq;
+        weights = weights)
+        ℓ = shoutlens(r)
+        @test q - δq ≤ ℓ ≤ q + δq
+    end
+end
+
 using MotifSequenceGenerator: DeadEndMotifs
 @test_throws ArgumentError random_sequence(shouts, q, shoutlimits, shouttranslate, 0.0)
 @test_throws DeadEndMotifs random_sequence(shouts, q, shoutlimits, shouttranslate, 0.000001)
