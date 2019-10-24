@@ -1,5 +1,7 @@
 name = "MotifSequenceGenerator"
 uuid = "7d228ccb-0fc9-53c8-a429-8c9b5b572bc3"
+repo = "https://github.com/JuliaMusic/MotifSequenceGenerator.jl.git"
+version = "1.0.0"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
